@@ -21,19 +21,27 @@ class Dataset3D_NPY(Dataset):
 
 
     def __getitem__(self, index):
-        
+        # print(f'loading {self.img_dir}/{self.filenames[index]}')
         img = np.load(f"{self.img_dir}/{self.filenames[index]}")
-        label = np.load(f"{self.label_dir}/{self.filenames[index]}")
+        # label = np.load(f"{self.label_dir}/{self.filenames[index]}")
+        
 
         # change to float
         img = img.astype(np.float32)
-        label = label.astype(np.float32)
+        # label = label.astype(np.float32)
 
-        # # normalize
-        img = img / 255.0
+        # # normalize to [0,1]
+        # img = img / 255.0
+        img = np.clip(img, 1000, 1256)
+        # label = np.clip(label, 1000, 1256)
+        img = (img - 1000) / 255. 
+        # img = ((image - 1000) / 255 - 0.5) * 2.
+        # label = (label - 1000) / 255. 
+        # label = ((image - 1000) / 255 - 0.5) * 2.
 
-        img = np.stack((img, label), axis=0)
-        item = torch.from_numpy(img).type(torch.FloatTensor)
+
+        # img = np.stack((img, label), axis=0)
+        item = torch.from_numpy(img).type(torch.FloatTensor).unsqueeze(0)
         
         return item
 

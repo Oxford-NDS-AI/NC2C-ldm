@@ -7,8 +7,6 @@ from dataset3d_npy import Dataset3D_NPY
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning import Trainer
 
-
-
 if __name__ == "__main__":
     # args
     parser = argparse.ArgumentParser(description='Train a VAE')
@@ -22,6 +20,7 @@ if __name__ == "__main__":
     Determine if any GPUs are available
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # device = torch.device('cpu')
 
     # Load config file
     with open(config_filepath, 'r') as config_file:
@@ -32,6 +31,9 @@ if __name__ == "__main__":
     hyperparams = configs['hyperparams']
     dataconf = configs['dataconf']
     modelconf = configs['model_restore']
+    deviceconf = configs['deviceconf']
+
+    device_num = deviceconf['cuda_num']
 
     learning_rate = hyperparams['lr']
     batch_size = hyperparams['batch_size']
@@ -45,6 +47,7 @@ if __name__ == "__main__":
 
     val_img_dir   = dataconf['val_img_dir']
     val_label_dir = dataconf['val_label_dir']
+
 
     train_ds = Dataset3D_NPY(img_dir, label_dir)
     val_ds = Dataset3D_NPY(val_img_dir, val_label_dir)
@@ -73,10 +76,11 @@ if __name__ == "__main__":
 
     trainer = Trainer(
         max_epochs=num_epochs,
-        progress_bar_refresh_rate=1,
-        devices = 1,
+        # progress_bar_refresh_rate=1,
+        devices = device_num,
         accelerator = "gpu",
-        callbacks=[checkpoint_callback, custom_callback]
+        callbacks = [checkpoint_callback, custom_callback],
+        precision = 16,
     )
     # Train the Model
     trainer.fit(network)

@@ -1,3 +1,9 @@
+# temporal files
+*.png 
+*.out
+lightning_logs/
+taming/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

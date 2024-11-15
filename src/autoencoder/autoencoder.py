@@ -111,7 +111,7 @@ class Downsample(nn.Module):
 
     def forward(self, x):
         if self.with_conv:
-            pad = (0,1,0,1, 0, 1)
+            pad = (0, 1, 0, 1, 0, 1)
             x = torch.nn.functional.pad(x, pad, mode="constant", value=0)
             x = self.conv(x)
         else:
@@ -468,6 +468,7 @@ class AutoencoderKL(pl.LightningModule):
         self.train_ds = train_ds
         self.val_ds = val_ds
         self.batch_size = batch_size
+        # self.automatic_optimization = False
 
         assert ddconfig["double_z"]
         self.quant_conv = torch.nn.Conv3d(2*ddconfig["z_channels"], 2*embed_dim, 1)
@@ -479,7 +480,9 @@ class AutoencoderKL(pl.LightningModule):
         if monitor is not None:
             self.monitor = monitor
         if ckpt_path is not None:
+            print(f'Loading ckpt from {ckpt_path}')
             self.init_from_ckpt(ckpt_path, ignore_keys=ignore_keys)
+        self.validation_step_outputs = []
 
     def init_from_ckpt(self, path, ignore_keys=list()):
         import os
@@ -528,83 +531,94 @@ class AutoencoderKL(pl.LightningModule):
         return dec, posterior
 
     def train_dataloader(self):
-        return DataLoader(self.train_ds, batch_size = self.batch_size, shuffle = True, pin_memory = True, num_workers = 4)
+        return DataLoader(self.train_ds, batch_size = self.batch_size, shuffle = True, pin_memory = True, num_workers = 0)
         
     def val_dataloader(self):
-        return DataLoader(self.val_ds, batch_size=self.batch_size,shuffle=False, pin_memory = True, num_workers = 4)
+        return DataLoader(self.val_ds, batch_size=self.batch_size,shuffle=False, pin_memory = True, num_workers = 0)
 
-    def training_step(self, batch, batch_idx, optimizer_idx=0):
+    def training_step(self, batch, batch_idx):
         # inputs = self.get_input(batch, self.image_key)
         inputs = batch
         reconstructions, posterior = self(inputs)
-
-        if optimizer_idx == 0:
-            # train encoder+decoder+logvar
-            aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
+        # Forward pass
+        aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, self.global_step,
                                             last_layer=self.get_last_layer(), split="train")
+        return aeloss
 
-            self.log("aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-            # self.log("logvar", log_dict_ae["train/logvar"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
-            # self.log("w_recon_loss", log_dict_ae["train/w_nll_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+
+        # if optimizer_idx == 0:
+        #     # train encoder+decoder+logvar
+        #     aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, optimizer_idx, self.global_step,
+        #                                     last_layer=self.get_last_layer(), split="train")
+
+        #     self.log("aeloss", aeloss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
+        #     # self.log("logvar", log_dict_ae["train/logvar"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #     # self.log("w_recon_loss", log_dict_ae["train/w_nll_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
             
-            self.log("l1_loss", log_dict_ae["train/l1_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
-            self.log("xent_loss", log_dict_ae["train/xent_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #     self.log("l1_loss", log_dict_ae["train/l1_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #     self.log("xent_loss", log_dict_ae["train/xent_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
             
-            self.log("percept_loss", log_dict_ae["train/percept_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
-            self.log("w_kl_loss", log_dict_ae["train/w_kl_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #     self.log("percept_loss", log_dict_ae["train/percept_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
+        #     self.log("w_kl_loss", log_dict_ae["train/w_kl_loss"], prog_bar=True, logger=True, on_step=True, on_epoch=False)
             
-            self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False)
-            return aeloss
+        #     self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False)
+        #     return aeloss
 
 
     def validation_step(self, batch, batch_idx):
         # inputs = self.get_input(batch, self.image_key)
         inputs = batch
         reconstructions, posterior = self(inputs)
-        aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, 0, self.current_epoch,
+        aeloss, log_dict_ae = self.loss(inputs, reconstructions, posterior, self.current_epoch,
                                         last_layer=self.get_last_layer(), split="val")
 
         self.log("val/rec_loss", log_dict_ae["val/rec_loss"])
-        self.log("val/percept_loss", log_dict_ae["val/percept_loss"])
+        # self.log("val/percept_loss", log_dict_ae["val/percept_loss"])
 
         self.log_dict(log_dict_ae)
+        self.validation_step_outputs.append([reconstructions, posterior, inputs])
         return self.log_dict, reconstructions, posterior
 
-    def validation_epoch_end(self, validation_step_outputs):
+    def on_validation_epoch_end(self):
         if self.global_step == 0:
             return
             
-        all_preds = self.all_gather(validation_step_outputs[0])
+        all_preds = self.validation_step_outputs[0]
         
-        reconstructions = all_preds[1]
-        posterior = all_preds[2]
+        reconstructions = all_preds[0]
+        posterior = all_preds[1]
+        ori_imgs = all_preds[-1]
         
         # posterior check
         z = posterior.sample()
         
         # pick first case to check mean std
         znp = z[0].cpu().numpy()
-        print(f"\n\n{znp.shape} {np.mean(znp) = } {np.std(znp) = } [{np.min(znp):.3f}, {np.max(znp):.3f}]\n")
+        # print(f"\n\n{znp.shape} {np.mean(znp) = } {np.std(znp) = } [{np.min(znp):.3f}, {np.max(znp):.3f}]\n")
 
         if self.trainer.log_dir is not None:
             save_dir = Path(self.trainer.log_dir) / 'recon'
             save_dir.mkdir(exist_ok=True)
 
             # get the first item
-            output = np.transpose(reconstructions[0].cpu().numpy(), [1,2,3,0])
+            # output = np.transpose(reconstructions[0].cpu().numpy(), [1,2,3,0])
+            # input_img = np.transpose(ori_imgs[0].cpu().numpy(), [1,2,3,0])
+
+            output = reconstructions.squeeze().cpu().numpy()
+            input_img = ori_imgs.squeeze().cpu().numpy()
             # h5util.save(f"{save_dir}/recon_epoch.h5", "recon", np.expand_dims(outimg, axis=0))
 
 
-            outimg = sanitize_img(output[..., 0])
-            outlabel = np.argmax(output[..., 1:], axis=-1)
+            # outimg = sanitize_img(output[0, ...])
+            # outlabel = np.argmax(output[..., 1:], axis=-1)
 
-            outimg = np.squeeze(outimg * 255)
-            outimg = outimg.astype(np.uint8)
+            outimg = np.squeeze(output * 255)
+            # outimg = outimg.astype(np.uint8)
 
-            outlabel = np.squeeze(outlabel)
-            outlabel = outlabel.astype(np.uint8)
+            # outlabel = np.squeeze(outlabel)
+            # outlabel = outlabel.astype(np.uint8)
             h5util.save(f"{save_dir}/recon_epoch.h5", "recon_img", np.expand_dims(outimg, axis=0))
-            h5util.save(f"{save_dir}/recon_epoch.h5", "recon_label", np.expand_dims(outlabel, axis=0))
+            # h5util.save(f"{save_dir}/recon_epoch.h5", "recon_label", np.expand_dims(outlabel, axis=0))
 
             # im = Image.fromarray(outimg[80, ..., 0])
             # im.save(f"{save_dir}/echo-{self.current_epoch}.png")
@@ -613,12 +627,12 @@ class AutoencoderKL(pl.LightningModule):
             # im.save(f"{save_dir}/echo-{self.current_epoch}-label.png")
 
             plt.subplot(121)
-            plt.imshow(outimg[80], cmap='viridis')
+            plt.imshow(outimg[..., 80], cmap='viridis')
             plt.colorbar()
             plt.axis('off')
 
             plt.subplot(122)
-            plt.imshow(outlabel[80], cmap='viridis')
+            plt.imshow(input_img[..., 80], cmap='viridis')
             plt.colorbar()
             plt.axis('off')
             
@@ -626,6 +640,7 @@ class AutoencoderKL(pl.LightningModule):
             plt.close()
 
             # return reconstructions, posterior
+        self.validation_step_outputs.clear()
 
     def test_step(self, batch, batch_idx):
         inputs = batch
@@ -647,7 +662,7 @@ class AutoencoderKL(pl.LightningModule):
                                   list(self.post_quant_conv.parameters()),
                                   lr=lr, betas=(0.5, 0.9))
 
-        return [opt_ae], []
+        return opt_ae
 
     def get_last_layer(self):
         return self.decoder.conv_out.weight

@@ -1,12 +1,12 @@
 dataconf:
-  train_img_dir:   "/home/ning/data/NC2C_OxAAA_paired_160_160_128/train/images"
+  train_img_dir:   "/home/ning/data/NC2C_OxAAA_paired_160_160_128/train/labels"
   train_label_dir: "/home/ning/data/NC2C_OxAAA_paired_160_160_128/train/labels"
 
-  val_img_dir:     "/home/ning/data/NC2C_OxAAA_paired_160_160_128/test/images"
+  val_img_dir:     "/home/ning/data/NC2C_OxAAA_paired_160_160_128/test/labels"
   val_label_dir:   "/home/ning/data/NC2C_OxAAA_paired_160_160_128/test/labels"
-
+  
 deviceconf:
-  cuda_num: [1] 
+  cuda_num: [0]
   
 hyperparams:
   lr: 0.00001
@@ -15,7 +15,7 @@ hyperparams:
   embed_dim: 4
 
 model_restore:
-  ckpt_path: "/home/ning/projects/diff-3/src/lightning_logs/version_0"
+  ckpt_path: "/home/ning/projects/diff-3/src/lightning_logs/version_1"
 
 ddconfig:
   double_z: true

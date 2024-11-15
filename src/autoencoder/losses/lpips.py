@@ -230,7 +230,8 @@ class LPIPSWithDiscriminator(nn.Module):
         self.kl_weight = kl_weight
         self.pixel_weight = pixelloss_weight
         self.perceptual_loss = LPIPS().eval()
-        self.perceptual_weight = perceptual_weight
+        # self.perceptual_weight = perceptual_weight
+        self.perceptual_weight = 0
         self.nll_mode = nll_mode
         # output log variance
         self.logvar = nn.Parameter(torch.ones(size=()) * logvar_init)
@@ -238,50 +239,52 @@ class LPIPSWithDiscriminator(nn.Module):
         print(f"{nll_mode = }")
 
     
-    def forward(self, inputs, reconstructions, posteriors, optimizer_idx,
+    def forward(self, inputs, reconstructions, posteriors,
                 global_step, last_layer=None, cond=None, split="train",
                 weights=None):
         # rec_loss = torch.abs(inputs.contiguous() - reconstructions.contiguous())
 
         # l1 loss for first channel
-        l1_loss = torch.abs(inputs[:, 0, ...].contiguous() - reconstructions[:, 0, ...].contiguous())
+        # l1_loss = torch.abs(inputs[:, 0, ...].contiguous() - reconstructions[:, 0, ...].contiguous())
+        l2_loss = (inputs.contiguous() - reconstructions.contiguous()) ** 2
 
         # sparse xent for channel 1 to 3
-        xent_loss = F.cross_entropy(reconstructions[:, 1:, ...].contiguous(),
-                                    inputs[:, 1, ...].contiguous().long())
+        # xent_loss = F.cross_entropy(reconstructions[:, 1:, ...].contiguous(),
+                                    # inputs[:, 1, ...].contiguous().long())
         
         # ------------------ reconstruction LOSS ------------------
-        rec_loss = l1_loss + xent_loss
+        # rec_loss = l1_loss + xent_loss
+        rec_loss = l2_loss
 
-        if self.perceptual_weight > 0:
-            # --- prep reconstruction for perceptual loss ---
-            # get first channel of input as img
-            rec_img = reconstructions[:, 0, ...].contiguous()
-            # collapse reconstructions channel 1 to 3 to 1 channel
-            rec_label = torch.argmax(reconstructions[:, 1:, ...].contiguous(), dim=1)
-            nr_labels = reconstructions.shape[1] - 2 # not including first channel & bg
-            # label need to be normalized
-            rec_label = rec_label.float() / nr_labels
-            # stack them together
-            rec_pair = torch.stack([rec_img, rec_label], dim=1)
+        # if self.perceptual_weight > 0:
+        #     # --- prep reconstruction for perceptual loss ---
+        #     # get first channel of input as img
+        #     rec_img = reconstructions[:, 0, ...].contiguous()
+        #     # collapse reconstructions channel 1 to 3 to 1 channel
+        #     rec_label = torch.argmax(reconstructions[:, 1:, ...].contiguous(), dim=1)
+        #     nr_labels = reconstructions.shape[1] - 2 # not including first channel & bg
+        #     # label need to be normalized
+        #     rec_label = rec_label.float() / nr_labels
+        #     # stack them together
+        #     rec_pair = torch.stack([rec_img, rec_label], dim=1)
 
-            # --- prep input for perceptual loss ---
-            # get first channel of input as img
-            input_img = inputs[:, 0, ...].contiguous()
-            # get second channel of input as label
-            input_label = inputs[:, 1, ...].contiguous()
-            # normalize
-            input_label = input_label.float() / nr_labels
-            # stack them together
-            input_pair = torch.stack([input_img, input_label], dim=1)
+        #     # --- prep input for perceptual loss ---
+        #     # get first channel of input as img
+        #     input_img = inputs[:, 0, ...].contiguous()
+        #     # get second channel of input as label
+        #     input_label = inputs[:, 1, ...].contiguous()
+        #     # normalize
+        #     input_label = input_label.float() / nr_labels
+        #     # stack them together
+        #     input_pair = torch.stack([input_img, input_label], dim=1)
 
-            p_loss = self.perceptual_loss(input_pair.contiguous(), rec_pair.contiguous())
+        #     p_loss = self.perceptual_loss(input_pair.contiguous(), rec_pair.contiguous())
 
-            # --- get total loss ---
-            rec_loss = rec_loss + self.perceptual_weight * p_loss
-        else:
-            # no perceptual loss
-            p_loss = torch.zeros_like(rec_loss)
+        #     # --- get total loss ---
+        #     rec_loss = rec_loss + self.perceptual_weight * p_loss
+        # else:
+        #     # no perceptual loss
+        #     p_loss = torch.zeros_like(rec_loss)
             
         nll_loss = rec_loss / torch.exp(self.logvar) + self.logvar
       
@@ -304,22 +307,24 @@ class LPIPSWithDiscriminator(nn.Module):
         weighted_kl_loss = self.kl_weight * kl_loss
 
         # now the GAN part
-        if optimizer_idx == 0:
-            loss = weighted_nll_loss + weighted_kl_loss
+        # if optimizer_idx == 0:
+        #     loss = weighted_nll_loss + weighted_kl_loss
+        loss = weighted_kl_loss + weighted_nll_loss
 
-            log = {"{}/total_loss".format(split): loss.clone().detach().mean(), 
-                    "{}/logvar".format(split): self.logvar.detach().mean(),
-                    "{}/kl_loss".format(split): kl_loss.detach().mean(), 
-                    "{}/nll_loss".format(split): nll_loss.detach().mean(),
-                    "{}/rec_loss".format(split): rec_loss.detach().mean(),
-                    "{}/l1_loss".format(split): l1_loss.detach().mean(),
-                    "{}/xent_loss".format(split): xent_loss.detach().mean(),
-                    "{}/w_nll_loss".format(split): weighted_nll_loss.detach().mean(),
-                    "{}/w_kl_loss".format(split): weighted_kl_loss.detach().mean(),
-                    "{}/percept_loss".format(split): (self.perceptual_weight * p_loss).detach().mean(),
-                    
-                   }
-            return loss, log
+        log = {"{}/total_loss".format(split): loss.clone().detach().mean(), 
+                "{}/logvar".format(split): self.logvar.detach().mean(),
+                "{}/kl_loss".format(split): kl_loss.detach().mean(), 
+                "{}/nll_loss".format(split): nll_loss.detach().mean(),
+                "{}/rec_loss".format(split): rec_loss.detach().mean(),
+                "{}/l2_loss".format(split): l2_loss.detach().mean(),
+                # "{}/xent_loss".format(split): xent_loss.detach().mean(),
+                "{}/w_nll_loss".format(split): weighted_nll_loss.detach().mean(),
+                "{}/w_kl_loss".format(split): weighted_kl_loss.detach().mean(),
+                # "{}/percept_loss".format(split): (self.perceptual_weight * p_loss).detach().mean(),
+                
+                }
+        #     return loss, log
+        return loss, log
 
 class ScalingLayer(nn.Module):
     def __init__(self):

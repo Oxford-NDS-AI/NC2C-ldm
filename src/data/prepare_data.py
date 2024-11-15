@@ -1,7 +1,8 @@
 import argparse
 import os
 import numpy as np
-from  util.mhd_util import read_mhd
+# from  util.mhd_util import read_mhd
+from util.nii_util import read_nii
 import util.h5_util as h5util
 from scipy.ndimage import zoom
 
@@ -36,7 +37,7 @@ class Preprocessor():
         self.label_paths = []
         for p in self.filenames:
             if os.path.exists(f"{label_dir}/{p}.{ext}"):
-                self.img_paths.append(f"{data_dir}/{p}_0000.{ext}")
+                self.img_paths.append(f"{data_dir}/{p}_registered.{ext}")
                 self.label_paths.append(f"{label_dir}/{p}.{ext}")
 
     def _calculate_ratio_pads(self, img):
@@ -69,18 +70,19 @@ class Preprocessor():
 
     def process_data(self, index):
         path = self.img_paths[index]
-        img = read_mhd(path)
+        print(path)
+        img = read_nii(path)
 
         mask_path = self.label_paths[index]
-        mask = read_mhd(mask_path)
+        mask = read_nii(mask_path)
         
         r, pads = self._calculate_ratio_pads(img)
         img = self._resize(img, r, pads, 3)
         mask = self._resize(mask, r, pads, 0)
 
         # as uint8
-        img = img.astype(np.uint8)
-        mask = mask.astype(np.uint8)
+        img = img.astype(np.float32)
+        mask = mask.astype(np.float32)
 
         if self.format == "h5":
             output_filepath = f"{self.output_dir}/mitea.h5"
@@ -108,7 +110,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=str, required=True)
     parser.add_argument("--label-dir", type=str, required=True)
-    parser.add_argument("--image-size", type=int, nargs="+", default=[160, 160, 128])
+    parser.add_argument("--image-size", type=int, nargs="+", default=[128, 128, 128])
     parser.add_argument("--output-dir", type=str, required=True)
     parser.add_argument("--subset", type=str, required=True)
     parser.add_argument("--format", type=str, default="npy")
