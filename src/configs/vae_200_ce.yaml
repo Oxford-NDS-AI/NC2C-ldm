@@ -1,0 +1,38 @@
+dataconf:
+  train_img_dir:   "/home/ning/data/NC2C_OxAAA_paired_160_160_128/train/images"
+  train_label_dir: "../data/data_mitea/train/labels"
+
+  val_img_dir:     "/home/ning/data/NC2C_OxAAA_paired_160_160_128/test/images"
+  val_label_dir:   "../data/data_mitea/test/labels"
+
+deviceconf:
+  cuda_num: [1] 
+  
+hyperparams:
+  lr: 0.0001
+  batch_size: 1
+  epochs: 100
+  embed_dim: 128
+
+model_restore:
+  ckpt_path: /home/ning/projects/NC2C-ldm/src/lightning_logs/version_15
+
+ddconfig:
+  double_z: true
+  z_channels: 128 
+  resolution: [128, 128, 128]
+  in_channels: 1
+  out_ch: 1 # 1 img + 3 labels
+  ch: 32  
+  ch_mult: [1, 2, 4, 8]  
+  num_res_blocks: 2
+  attn_resolutions: []
+  dropout: 0.0
+
+lossconfig:
+  target: "losses.lpips.LPIPSWithDiscriminator"
+  params:
+    perceptual_weight: 1
+    kl_weight: 1
+    nll_mode: sum
+    

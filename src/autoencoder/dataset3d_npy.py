@@ -1,7 +1,42 @@
 import numpy as np
 from torch.utils.data import Dataset
+import nibabel as nib 
 import os
 import torch
+
+class Dataset3D_NII(Dataset):
+    def __init__(
+        self,
+        img_dir,
+    ):
+        super().__init__()
+        self.img_dir = img_dir
+        
+        filenames = os.listdir(img_dir)
+        self.filenames = [p for p in filenames if p.endswith(".nii.gz")]
+        self.filenames.sort()
+
+
+    def __len__(self):
+        return len(self.filenames)
+
+    def __read_image(self, path):
+        img = nib.load(path)
+        data = img.get_fdata()
+        return data
+
+    def __getitem__(self, index):
+        # print(f'loading {self.img_dir}/{self.filenames[index]}')
+        img = self.__read_image(f"{self.img_dir}/{self.filenames[index]}")
+        
+
+        # change to float
+        img = img.astype(np.float32)
+
+
+        item = torch.from_numpy(img).type(torch.FloatTensor).unsqueeze(0)
+        
+        return item 
 
 class Dataset3D_NPY(Dataset):
     def __init__(
@@ -15,6 +50,8 @@ class Dataset3D_NPY(Dataset):
         
         filenames = os.listdir(img_dir)
         self.filenames = [p for p in filenames if p.endswith(".npy")]
+        self.filenames.sort()
+
 
     def __len__(self):
         return len(self.filenames)

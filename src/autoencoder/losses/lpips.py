@@ -256,35 +256,15 @@ class LPIPSWithDiscriminator(nn.Module):
         # rec_loss = l1_loss + xent_loss
         rec_loss = l2_loss
 
-        # if self.perceptual_weight > 0:
+        if self.perceptual_weight > 0:
         #     # --- prep reconstruction for perceptual loss ---
-        #     # get first channel of input as img
-        #     rec_img = reconstructions[:, 0, ...].contiguous()
-        #     # collapse reconstructions channel 1 to 3 to 1 channel
-        #     rec_label = torch.argmax(reconstructions[:, 1:, ...].contiguous(), dim=1)
-        #     nr_labels = reconstructions.shape[1] - 2 # not including first channel & bg
-        #     # label need to be normalized
-        #     rec_label = rec_label.float() / nr_labels
-        #     # stack them together
-        #     rec_pair = torch.stack([rec_img, rec_label], dim=1)
+            p_loss = self.perceptual_loss(inputs.contiguous(), reconstructions.contiguous())
 
-        #     # --- prep input for perceptual loss ---
-        #     # get first channel of input as img
-        #     input_img = inputs[:, 0, ...].contiguous()
-        #     # get second channel of input as label
-        #     input_label = inputs[:, 1, ...].contiguous()
-        #     # normalize
-        #     input_label = input_label.float() / nr_labels
-        #     # stack them together
-        #     input_pair = torch.stack([input_img, input_label], dim=1)
-
-        #     p_loss = self.perceptual_loss(input_pair.contiguous(), rec_pair.contiguous())
-
-        #     # --- get total loss ---
-        #     rec_loss = rec_loss + self.perceptual_weight * p_loss
-        # else:
-        #     # no perceptual loss
-        #     p_loss = torch.zeros_like(rec_loss)
+            # --- get total loss ---
+            rec_loss = rec_loss + self.perceptual_weight * p_loss
+        else:
+            # no perceptual loss
+            p_loss = torch.zeros_like(rec_loss)
             
         nll_loss = rec_loss / torch.exp(self.logvar) + self.logvar
       
@@ -320,7 +300,7 @@ class LPIPSWithDiscriminator(nn.Module):
                 # "{}/xent_loss".format(split): xent_loss.detach().mean(),
                 "{}/w_nll_loss".format(split): weighted_nll_loss.detach().mean(),
                 "{}/w_kl_loss".format(split): weighted_kl_loss.detach().mean(),
-                # "{}/percept_loss".format(split): (self.perceptual_weight * p_loss).detach().mean(),
+                "{}/percept_loss".format(split): (self.perceptual_weight * p_loss).detach().mean(),
                 
                 }
         #     return loss, log
