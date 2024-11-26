@@ -1,1 +1,2 @@
+# nohup python /home/ning/projects/NC2C-ldm/src/autoencoder/trainer_autoencoderKL.py --config /home/ning/projects/NC2C-ldm/src/configs/vae_100_nc.yaml &
 nohup python /home/ning/projects/NC2C-ldm/src/autoencoder/trainer_autoencoderKL.py --config /home/ning/projects/NC2C-ldm/src/configs/vae_100_nc.yaml &
