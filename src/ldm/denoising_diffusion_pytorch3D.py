@@ -26,7 +26,7 @@ from tqdm.auto import tqdm
 from ema_pytorch import EMA
 
 from accelerate import Accelerator
-import util.h5_util as h5util
+import h5_util as h5util
 from dataset_h5 import DatasetH5
 
 # constants
@@ -174,6 +174,7 @@ class Block(nn.Module):
         x = self.proj(x)
         x = self.norm(x)
 
+        # scale_shift is added for time embedding
         if exists(scale_shift):
             scale, shift = scale_shift
             x = x * (scale + 1) + shift
@@ -200,6 +201,7 @@ class ResnetBlock(nn.Module):
             time_emb = self.mlp(time_emb)
             time_emb = rearrange(time_emb, 'b c -> b c 1 1 1')
             scale_shift = time_emb.chunk(2, dim = 1)
+            # here scale_shift is formed (scale, shift) from chunking the time embedding.
 
         h = self.block1(x, scale_shift = scale_shift)
 
@@ -217,14 +219,17 @@ class LinearAttention(nn.Module):
 
         self.to_out = nn.Sequential(
             nn.Conv3d(hidden_dim, dim, 1),
+            # this layer norm is not in the original implementation
             LayerNorm(dim)
         )
 
     def forward(self, x):
         b, c, d, h, w = x.shape
         qkv = self.to_qkv(x).chunk(3, dim = 1)
-        q, k, v = map(lambda t: rearrange(t, 'b (h c) z x y -> b h c (z x y)', h = self.heads), qkv)
-
+        q, k, v = map(
+            lambda t: rearrange(t, 'b (h c) z x y -> b h c (z x y)', h = self.heads), qkv
+            )
+        # The new dimensions become: (b, h, c, (z * x * y))
         q = q.softmax(dim = -2)
         k = k.softmax(dim = -1)
 
@@ -232,12 +237,15 @@ class LinearAttention(nn.Module):
         v = v / (h * w * d)
 
         context = torch.einsum('b h d n, b h e n -> b h d e', k, v)
-
+        # 'b h d e': The resulting tensor will keep b, h, d, and e, while summing over n (the shared dimension).
+        # This performs a dot product along the n dimension, reducing it.
         out = torch.einsum('b h d e, b h d n -> b h e n', context, q)
+        # This is a weighted sum over the d dimension, combining context and q.
         out = rearrange(out, 'b h c (z x y) -> b (h c) z x y', h = self.heads, x = h, y = w, z = d)
         return self.to_out(out)
 
 class Attention(nn.Module):
+    # SelfAttention
     def __init__(self, dim, heads = 4, dim_head = 32):
         super().__init__()
         self.scale = dim_head ** -0.5
@@ -293,6 +301,7 @@ class Unet3D(nn.Module):
         dims = [init_dim, *map(lambda m: dim * m, dim_mults)]
         in_out = list(zip(dims[:-1], dims[1:]))
 
+        # partial allows you to fix certain arguments of a function or class while leaving others to be specified later.
         block_klass = partial(ResnetBlock, groups = resnet_block_groups)
 
         # time embeddings
@@ -902,8 +911,9 @@ class Trainer3D(object):
                         self.save(milestone)
 
                         all_images = torch.cat(all_images_list, dim = 0)
+                        print(all_images.shape)
                         print(f"Model-{milestone}: {total_loss:.4f}\n")
-                        utils.save_image(all_images[:,:,self.image_size[0]//2,...], str(self.results_folder / f'sample-{milestone}.png'), nrow = int(math.sqrt(self.num_samples)))
+                        utils.save_image(all_images[8,self.image_size[0]//2,8,...], str(self.results_folder / f'sample-{milestone}.png'), nrow = int(math.sqrt(self.num_samples)))
                         h5util.save(f"{self.results_folder}/_result.h5", f"iter-{milestone}/result", all_images.cpu().numpy())
                         h5util.save(f"{self.results_folder}/_result.h5", f"min", np.asarray([self.ds.global_min]))
                         h5util.save(f"{self.results_folder}/_result.h5", f"max", np.asarray([self.ds.global_max]))
