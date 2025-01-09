@@ -1,6 +1,6 @@
 
 import argparse
-from ldm.denoising_diffusion_pytorch3D import Unet3D, GaussianDiffusion3D, Trainer3D
+from denoising_diffusion_pytorch3D import Unet3D, GaussianDiffusion3D, Trainer3D
 import os 
 
 if __name__ == "__main__":
@@ -16,8 +16,8 @@ if __name__ == "__main__":
     batch_size = args.batch_size
 
     
-    im_size = (20,20,16)
-    channel = 4
+    im_size = (16,16,16)
+    channel = 128
     sample_step = 250
     
 

@@ -135,41 +135,57 @@ if __name__ == "__main__":
             z = torch.from_numpy(img).type(torch.FloatTensor)
             
             recon = network.decode(z.to(device))
-            recon = recon.cpu().numpy()
-            recon = np.transpose(recon, (0,2,3,4,1))
-            
-            recon_img = sanitize_img(recon[...,0])
-            recon_img = recon_img * 255
-
-            recon_label = np.argmax(recon[...,1:], axis=-1)
-
-            # convert to uint8
-            recon_img = recon_img.astype(np.uint8)
-            recon_label = recon_label.astype(np.uint8)
+            recon = recon.squeeze().cpu().numpy()
+            print(recon.shape)
         
-            recon = np.stack([recon_img, recon_label], axis=-1)
+            plt.subplot(121)
+            plt.imshow(recon[..., 80], cmap='viridis')
+            plt.colorbar()
+            plt.axis('off')
 
-            h5util.save(output_file, output_imgcol, recon_img, compression="gzip", dtype="uint8")
-            h5util.save(output_file, output_labelcol, recon_label, compression="gzip", dtype="uint8")
+            plt.subplot(122)
+            plt.imshow(recon[..., 80], cmap='viridis')
+            plt.colorbar()
+            plt.axis('off')
+            
+            plt.savefig(f"{output_dir}/echo-{idx}.png")
+            plt.close()
 
-            # For visualization purposes
-            echo_img  = recon[:,img_size[0]//2,..., :1]
-            label_img = recon[:,img_size[0]//2,..., 1:]
+            # recon = np.transpose(recon, (0,2,3,4,1))
+            
+            # recon_img = sanitize_img(recon[...,0])
+            # recon_img = recon_img * 255
+            # print(recon_img.shape)
+
+            # # recon_label = np.argmax(recon[...,1:], axis=-1)
+
+            # # convert to uint8
+            # # recon_img = recon_img.astype(np.uint8)
+            # # recon_label = recon_label.astype(np.uint8)
+        
+            # recon = np.stack([recon_img, recon_label], axis=-1)
+
+            # h5util.save(output_file, output_imgcol, recon_img, compression="gzip", dtype="uint8")
+            # # h5util.save(output_file, output_labelcol, recon_label, compression="gzip", dtype="uint8")
+
+            # # For visualization purposes
+            # echo_img  = recon[:,img_size[0]//2,..., :1]
+            # label_img = recon[:,img_size[0]//2,..., 1:]
 
             
 
-            echo_imgs = update_list(echo_imgs, echo_img)
-            label_imgs = update_list(label_imgs, label_img)
+            # echo_imgs = update_list(echo_imgs, echo_img)
+            # label_imgs = update_list(label_imgs, label_img)
             
-            message +=(f" {(time.time()-start_time):.2f} sec")
-            print(f"\r{message}", end='')
+            # message +=(f" {(time.time()-start_time):.2f} sec")
+            # print(f"\r{message}", end='')
 
             
         # end of for loop
         print(f"\n{len_data} images generated! Total time: {(time.time()-start_time0):.2f} sec")
     # end of torch no grad
 
-    show_images(echo_imgs, label_imgs)
+    # show_images(echo_imgs, label_imgs)
 
 
 

@@ -5,7 +5,8 @@ import math
 import numpy as np
 import h5py
 import argparse
-import util.h5_util as h5util
+import h5_util as h5util
+
 
 def num_to_groups(num, divisor):
     groups = num // divisor
@@ -36,8 +37,9 @@ if __name__ == "__main__":
     else:
         output_filename = f"_samples.h5"
     
-    im_size = (20,20,16)
-    channel = 4
+    # im_size = (20,20,16)
+    im_size = (16,16,16)
+    channel = 128
     sample_step = 100
     batch_size = 32
 
