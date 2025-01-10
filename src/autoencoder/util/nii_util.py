@@ -1,4 +1,5 @@
 import nibabel as nib 
+import numpy as np 
 
 def read_nii(filename):
     '''
@@ -8,6 +9,3 @@ def read_nii(filename):
     image = nib.load(filename).get_fdata()
     return image
 
-
-def write_nii(img, filepath):
-    pass

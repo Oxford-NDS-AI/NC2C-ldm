@@ -1,6 +1,6 @@
 
 import argparse
-from denoising_diffusion_pytorch3D import Unet3D, GaussianDiffusion3D, Trainer3D
+from denoising_diffusion_pytorch3D import Unet3D, GaussianDiffusion3D, Trainer3D_NPY
 import os 
 
 if __name__ == "__main__":
@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser.add_argument('--batch-size', type=int, help='Batch size', default=64)
     args = parser.parse_args()
 
-    h5_filepath = args.input
+    npy_filepath = args.input
     model_dir = args.model_dir
     batch_size = args.batch_size
 
@@ -19,10 +19,9 @@ if __name__ == "__main__":
     im_size = (32,32,32)
     channel = 1
     sample_step = 250
-    
 
     model = Unet3D(
-        dim = 64,
+        dim = 64, # ???
         dim_mults = (1, 2, 4),
         channels = channel
     ).cuda()
@@ -38,9 +37,9 @@ if __name__ == "__main__":
     # create model dir
     os.makedirs(model_dir, exist_ok=True)
 
-    trainer = Trainer3D(
+    trainer = Trainer3D_NPY(
         diffusion,
-        h5_filepath = h5_filepath,
+        npy_filepath=npy_filepath,
         # image_size = im_size,
         dynamic_sampling = True,
         train_batch_size = batch_size,
@@ -50,7 +49,7 @@ if __name__ == "__main__":
         ema_decay = 0.995,                # exponential moving average decay
         # amp = True                        # turn on mixed precision
         results_folder = model_dir,
-        num_samples=16,
+        num_samples=16, # number of samples during validation phase [16, c, d, h, w]
         save_and_sample_every = 1000,
     )
 
