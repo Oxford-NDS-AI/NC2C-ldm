@@ -754,7 +754,7 @@ class GaussianDiffusion3D(nn.Module):
         # assert h == img_size and w == img_size, f'height and width of image must be {img_size}'
         t = torch.randint(0, self.num_timesteps, (b,), device=device).long()
 
-        img = normalize_to_neg_one_to_one(img)
+        # img = normalize_to_neg_one_to_one(img) # since I already normalised to [-1, 1] in dataloader
         return self.p_losses(img, t, *args, **kwargs)
 
 
@@ -945,6 +945,7 @@ class Trainer3D_NPY(object):
         amp = False,
         fp16 = False,
         split_batches = True,
+        wandb_logger = None
     ):
         super().__init__()
 
@@ -967,7 +968,6 @@ class Trainer3D_NPY(object):
         self.train_num_steps = train_num_steps
         self.image_size = diffusion_model.image_size
         self.image_dimension = self.image_size
-        print(self.image_dimension)
 
         if npy_filepath is not None:
             # dataset and dataloader
@@ -996,6 +996,9 @@ class Trainer3D_NPY(object):
 
         self.model, self.opt = self.accelerator.prepare(self.model, self.opt)
 
+        self.wandb_logger = wandb_logger
+        
+
     def save(self, milestone):
         if not self.accelerator.is_local_main_process:
             return
@@ -1023,6 +1026,7 @@ class Trainer3D_NPY(object):
         self.step = data['step']
         self.opt.load_state_dict(data['opt'])
         self.ema.load_state_dict(data['ema'])
+        
 
         if 'version' in data:
             print(f"loading from version {data['version']}")
@@ -1055,6 +1059,10 @@ class Trainer3D_NPY(object):
 
                 accelerator.clip_grad_norm_(self.model.parameters(), 1.0)
                 pbar.set_description(f'loss: {total_loss:.4f}')
+                # logging loss on wandb
+                if exists(self.wandb_logger):
+                    self.wandb_logger.log_metrics(metrics = {'total_loss' : total_loss}, step = self.step)
+
 
                 accelerator.wait_for_everyone()
 
@@ -1079,9 +1087,17 @@ class Trainer3D_NPY(object):
                         self.save(milestone)
 
                         all_images = torch.cat(all_images_list, dim = 0)
-                        print(all_images.shape)
+                        # logging on wandb
+                        to_show_img = all_images[0,0,8,...]
+                        to_show_lr = self.opt.param_groups[0]['lr']
+                        if exists(self.wandb_logger):
+                            # learning rate, 
+                            self.wandb_logger.log_metrics(metrics = {'lr' : to_show_lr}, step = self.step)
+                            # generated image
+                            self.wandb_logger.log_images([to_show_img], ['generated sample'], step=self.step)
+
                         print(f"Model-{milestone}: {total_loss:.4f}\n")
-                        utils.save_image(all_images[0,0,8,...], str(self.results_folder / f'sample-{milestone}.png'), nrow = int(math.sqrt(self.num_samples)))
+                        utils.save_image(to_show_img, str(self.results_folder / f'sample-{milestone}.png'), nrow = int(math.sqrt(self.num_samples)))
                         h5util.save(f"{self.results_folder}/_result.h5", f"iter-{milestone}/result", all_images.cpu().numpy())
                         # h5util.save(f"{self.results_folder}/_result.h5", f"min", np.asarray([self.ds.global_min]))
                         # h5util.save(f"{self.results_folder}/_result.h5", f"max", np.asarray([self.ds.global_max]))
