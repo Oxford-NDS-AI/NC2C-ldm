@@ -21,7 +21,7 @@ if __name__ == "__main__":
     sample_step = 250
 
     model = Unet3D(
-        dim = 64, # ???
+        dim = 64, 
         dim_mults = (1, 2, 4),
         channels = channel
     ).cuda()
@@ -36,6 +36,9 @@ if __name__ == "__main__":
 
     # create model dir
     os.makedirs(model_dir, exist_ok=True)
+    # configure wandb logger
+    from visualizer import Visualiser_wandb
+    wandb_logger = Visualiser_wandb(project_name='NC2C_ldm', group='3D')
 
     trainer = Trainer3D_NPY(
         diffusion,
@@ -43,14 +46,15 @@ if __name__ == "__main__":
         # image_size = im_size,
         dynamic_sampling = True,
         train_batch_size = batch_size,
-        train_lr = 8e-5,
+        train_lr = 8e-5,    # changed from 8e-5
         train_num_steps = 50000,         # total training steps
         gradient_accumulate_every = 2,    # gradient accumulation steps
         ema_decay = 0.995,                # exponential moving average decay
         # amp = True                        # turn on mixed precision
         results_folder = model_dir,
-        num_samples=16, # number of samples during validation phase [16, c, d, h, w]
-        save_and_sample_every = 1000,
+        num_samples=2, # number of samples during validation phase [16, c, d, h, w]
+        save_and_sample_every = 1000, # 1000
+        wandb_logger = wandb_logger
     )
 
     trainer.train()
