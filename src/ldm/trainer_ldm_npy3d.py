@@ -16,7 +16,7 @@ if __name__ == "__main__":
     batch_size = args.batch_size
 
     
-    im_size = (32,32,32)
+    im_size = (64,64,64)
     channel = 1
     sample_step = 250
 
@@ -50,7 +50,7 @@ if __name__ == "__main__":
         train_num_steps = 50000,         # total training steps
         gradient_accumulate_every = 2,    # gradient accumulation steps
         ema_decay = 0.995,                # exponential moving average decay
-        # amp = True                        # turn on mixed precision
+        amp = False,                        # turn on mixed precision
         results_folder = model_dir,
         num_samples=2, # number of samples during validation phase [16, c, d, h, w]
         save_and_sample_every = 1000, # 1000

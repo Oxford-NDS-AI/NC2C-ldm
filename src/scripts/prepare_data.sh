@@ -12,8 +12,14 @@
 # --subset 'test' \
 # --image-size 32 32 32
 
-python ./src/data/prepare_data_exp.py \
---data-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_flipped/test/contrast' \
---output-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_32t3_exp' \
+python /home/ning/projects/NC2C-ldm/src/data/prepare_data_exp.py \
+--data-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_flipped/test/noncontrast' \
+--output-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_64t3_exp' \
 --subset 'test' \
---image-size 32 32 32
+--image-size 64 64 64
+
+python /home/ning/projects/NC2C-ldm/src/data/prepare_data_exp.py \
+--data-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_flipped/test/contrast' \
+--output-dir '/home/ning/hdd/DATASETS_DEV_NING/NC2C_OxAAA_paired_iso_64t3_exp' \
+--subset 'test' \
+--image-size 64 64 64
